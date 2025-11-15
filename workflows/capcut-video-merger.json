@@ -30,11 +30,11 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.4,
       "position": [440, 300],
-      "notes": "Reads video URLs from Google Sheets\n\nExpected columns:\n- video_url (required)\n- start_time (optional, default: 0)\n- end_time (optional, default: 10)"
+      "notes": "Reads video URLs from Google Sheets\n\nExpected columns:\n- video_url (required): URL to the video file\n- duration (required): Duration in seconds for each video\n\nVideos will be merged sequentially (one after another)."
     },
     {
       "parameters": {
-        "jsCode": "// Aggregate all video items and prepare for draft creation\nconst videos = [];\n\nfor (const item of $input.all()) {\n  videos.push({\n    video_url: item.json.video_url,\n    start_time: item.json.start_time || 0,\n    end_time: item.json.end_time || 10\n  });\n}\n\nreturn {\n  videos: videos,\n  videoCount: videos.length\n};"
+        "jsCode": "// Aggregate all video items and calculate sequential timeline positions\nconst videos = [];\nlet currentPosition = 0;\n\nfor (const item of $input.all()) {\n  const duration = item.json.duration || item.json.end_time || 10;\n  \n  videos.push({\n    video_url: item.json.video_url,\n    start_time: currentPosition,\n    end_time: currentPosition + duration,\n    duration: duration\n  });\n  \n  currentPosition += duration;\n}\n\nreturn {\n  videos: videos,\n  videoCount: videos.length,\n  totalDuration: currentPosition\n};"
       },
       "id": "aggregate-videos-node",
       "name": "Aggregate Videos",

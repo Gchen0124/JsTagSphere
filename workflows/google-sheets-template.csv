@@ -1,4 +1,4 @@
-video_url,start_time,end_time
-https://example.com/intro.mp4,0,5
-https://example.com/main-content.mp4,0,30
-https://example.com/outro.mp4,0,5
+video_url,duration
+https://example.com/intro.mp4,5
+https://example.com/main-content.mp4,30
+https://example.com/outro.mp4,5
