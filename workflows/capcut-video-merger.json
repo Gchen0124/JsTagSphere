@@ -34,7 +34,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Aggregate all video items and calculate sequential timeline positions\n// CapCut API uses MICROSECONDS (1 second = 1,000,000 microseconds)\nconst videos = [];\nlet currentPosition = 0;\n\nfor (const item of $input.all()) {\n  const durationSeconds = item.json.duration || item.json.end_time || 10;\n  const durationMicroseconds = durationSeconds * 1000000;\n  \n  videos.push({\n    video_url: item.json.video_url,\n    start_time: currentPosition,\n    end_time: currentPosition + durationMicroseconds,\n    duration: durationMicroseconds\n  });\n  \n  currentPosition += durationMicroseconds;\n}\n\nreturn {\n  videos: videos,\n  videoCount: videos.length,\n  totalDuration: currentPosition,\n  totalDurationSeconds: currentPosition / 1000000\n};"
+        "jsCode": "// Aggregate all video items and calculate sequential timeline positions\n// CapCut API HTTP endpoints use SECONDS (not microseconds)\nconst videos = [];\nlet currentTimelinePosition = 0;\n\nfor (const item of $input.all()) {\n  videos.push({\n    video_url: item.json.video_url,\n    source_start: 0,                    // Trim from start of source video\n    source_end: null,                   // null = use full video duration\n    target_start: currentTimelinePosition,  // Timeline position in SECONDS\n    volume: 1.0\n  });\n  \n  // We don't know duration yet, so use a placeholder\n  // The API will auto-detect and place videos sequentially\n  currentTimelinePosition += (item.json.duration || 10);  // User estimate\n}\n\nreturn {\n  videos: videos,\n  videoCount: videos.length\n};"
       },
       "id": "aggregate-videos-node",
       "name": "Aggregate Videos",
@@ -94,7 +94,7 @@
         "options": {},
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"draft_id\": \"{{ $json.draftId }}\",\n  \"video_url\": \"{{ $json.video_url }}\",\n  \"start\": {{ $json.start_time }},\n  \"end\": {{ $json.end_time }},\n  \"volume\": 1.0\n}",
+        "jsonBody": "={\n  \"draft_id\": \"{{ $json.draftId }}\",\n  \"video_url\": \"{{ $json.video_url }}\",\n  \"start\": {{ $json.source_start }},\n  \"target_start\": {{ $json.target_start }},\n  \"volume\": {{ $json.volume }}\n}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
