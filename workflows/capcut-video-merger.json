@@ -45,7 +45,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:9001/create_draft",
+        "url": "http://localhost:9000/create_draft",
         "options": {},
         "sendBody": true,
         "specifyBody": "json",
@@ -90,11 +90,11 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:9001/add_video",
+        "url": "http://localhost:9000/add_video",
         "options": {},
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"draft_id\": \"{{ $json.draftId }}\",\n  \"video_url\": \"{{ $json.video_url }}\",\n  \"start\": {{ $json.start_time }},\n  \"end\": {{ $json.end_time }},\n  \"volume\": 1.0,\n  \"transition\": \"fade\"\n}",
+        "jsonBody": "={\n  \"draft_id\": \"{{ $json.draftId }}\",\n  \"video_url\": \"{{ $json.video_url }}\",\n  \"start\": {{ $json.start_time }},\n  \"end\": {{ $json.end_time }},\n  \"volume\": 1.0\n}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -125,7 +125,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:9001/save_draft",
+        "url": "http://localhost:9000/save_draft",
         "options": {},
         "sendBody": true,
         "specifyBody": "json",
@@ -176,7 +176,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:9001/query_draft_status",
+        "url": "http://localhost:9000/query_draft_status",
         "options": {},
         "sendBody": true,
         "specifyBody": "json",
