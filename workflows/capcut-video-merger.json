@@ -1,0 +1,680 @@
+{
+  "name": "CapCut Video Merger Workflow",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "c89e4b1b-8f2c-4a7a-9e3d-1a2b3c4d5e6f",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "options": {
+          "range": "A:C"
+        }
+      },
+      "id": "1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+      "name": "Read Video URLs from Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [450, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Expected columns: video_url, start_time, end_time"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "video_urls_array",
+              "name": "videoUrls",
+              "value": "={{ $json.video_url }}",
+              "type": "string"
+            },
+            {
+              "id": "start_times",
+              "name": "startTime",
+              "value": "={{ $json.start_time || 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "end_times",
+              "name": "endTime",
+              "value": "={{ $json.end_time || 10 }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2b3c4d5e-6f7g-8h9i-0j1k-2l3m4n5o6p7q",
+      "name": "Process Video Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:9001/create_draft",
+        "options": {
+          "timeout": 10000
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "width",
+              "value": "1920"
+            },
+            {
+              "name": "height",
+              "value": "1080"
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "3c4d5e6f-7g8h-9i0j-1k2l-3m4n5o6p7q8r",
+      "name": "Create CapCut Draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [850, 300],
+      "notes": "Creates a new CapCut draft project and returns draft_id"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "draft_id_assignment",
+              "name": "draftId",
+              "value": "={{ $json.draft_id }}",
+              "type": "string"
+            },
+            {
+              "id": "draft_url_assignment",
+              "name": "initialDraftUrl",
+              "value": "={{ $json.draft_url }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4d5e6f7g-8h9i-0j1k-2l3m-4n5o6p7q8r9s",
+      "name": "Extract Draft ID",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "id": "5e6f7g8h-9i0j-1k2l-3m4n-5o6p7q8r9s0t",
+      "name": "Combine Draft with Videos",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "6f7g8h9i-0j1k-2l3m-4n5o-6p7q8r9s0t1u",
+      "name": "Loop Through Videos",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:9001/add_video",
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"draft_id\": \"{{ $node['Extract Draft ID'].json.draftId }}\",\n  \"video_url\": \"{{ $json.videoUrls }}\",\n  \"start\": {{ $json.startTime }},\n  \"end\": {{ $json.endTime }},\n  \"volume\": 1.0,\n  \"transition\": \"fade\"\n}",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "7g8h9i0j-1k2l-3m4n-5o6p-7q8r9s0t1u2v",
+      "name": "Add Video to Draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1650, 300],
+      "notes": "Adds each video to the CapCut draft with specified timing and transitions"
+    },
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "seconds"
+      },
+      "id": "8h9i0j1k-2l3m-4n5o-6p7q-8r9s0t1u2v3w",
+      "name": "Wait Between Videos",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1850, 300],
+      "webhookId": "wait-between-videos"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $node['Loop Through Videos'].context.noItemsLeft }}",
+              "operation": "equals",
+              "value2": "true"
+            }
+          ]
+        }
+      },
+      "id": "9i0j1k2l-3m4n-5o6p-7q8r-9s0t1u2v3w4x",
+      "name": "Check If All Videos Added",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2050, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:9001/save_draft",
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"draft_id\": \"{{ $node['Extract Draft ID'].json.draftId }}\",\n  \"draft_folder\": \"merged_videos_{{ $now.toFormat('yyyy-MM-dd_HH-mm-ss') }}\"\n}",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "0j1k2l3m-4n5o-6p7q-8r9s-0t1u2v3w4x5y",
+      "name": "Save CapCut Draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2250, 200],
+      "notes": "Saves the draft and initiates server-side processing. Returns task_id for status polling."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "task_id_assignment",
+              "name": "taskId",
+              "value": "={{ $json.task_id }}",
+              "type": "string"
+            },
+            {
+              "id": "draft_id_keep",
+              "name": "draftId",
+              "value": "={{ $node['Extract Draft ID'].json.draftId }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1k2l3m4n-5o6p-7q8r-9s0t-1u2v3w4x5y6z",
+      "name": "Extract Task ID",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [2450, 200]
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "id": "2l3m4n5o-6p7q-8r9s-0t1u-2v3w4x5y6z7a",
+      "name": "Wait Before First Poll",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2650, 200],
+      "webhookId": "wait-before-poll"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:9001/query_draft_status",
+        "options": {
+          "timeout": 10000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"task_id\": \"{{ $json.taskId }}\"\n}",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "3m4n5o6p-7q8r-9s0t-1u2v-3w4x5y6z7a8b",
+      "name": "Poll Draft Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2850, 200],
+      "notes": "Polls the CapCut API to check if draft processing is complete"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "operation": "equals",
+              "value2": "completed"
+            }
+          ]
+        }
+      },
+      "id": "4n5o6p7q-8r9s-0t1u-2v3w-4x5y6z7a8b9c",
+      "name": "Check If Completed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [3050, 200]
+    },
+    {
+      "parameters": {
+        "amount": 10,
+        "unit": "seconds"
+      },
+      "id": "5o6p7q8r-9s0t-1u2v-3w4x-5y6z7a8b9c0d",
+      "name": "Wait Before Next Poll",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [3250, 300],
+      "webhookId": "wait-poll-loop"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "final_draft_url",
+              "name": "finalDraftUrl",
+              "value": "={{ $json.draft_url }}",
+              "type": "string"
+            },
+            {
+              "id": "video_url_extract",
+              "name": "videoDownloadUrl",
+              "value": "={{ $json.video_url || $json.draft_url }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6p7q8r9s-0t1u-2v3w-4x5y-6z7a8b9c0d1e",
+      "name": "Extract Video URL",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [3250, 100]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.videoDownloadUrl }}",
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            }
+          ]
+        }
+      },
+      "id": "7q8r9s0t-1u2v-3w4x-5y6z-7a8b9c0d1e2f",
+      "name": "Download Merged Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3450, 100],
+      "notes": "Downloads the final merged video file from CapCut"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "=merged_video_{{ $now.toFormat('yyyy-MM-dd_HH-mm-ss') }}.mp4",
+        "options": {}
+      },
+      "id": "8r9s0t1u-2v3w-4x5y-6z7a-8b9c0d1e2f3g",
+      "name": "Save Video to Disk",
+      "type": "n8n-nodes-base.writeFile",
+      "typeVersion": 1,
+      "position": [3650, 100],
+      "notes": "Saves the downloaded video to the local file system"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "success_message",
+              "name": "message",
+              "value": "Video successfully merged and downloaded!",
+              "type": "string"
+            },
+            {
+              "id": "file_path",
+              "name": "filePath",
+              "value": "={{ $json.fileName }}",
+              "type": "string"
+            },
+            {
+              "id": "draft_url_final",
+              "name": "draftUrl",
+              "value": "={{ $node['Extract Video URL'].json.finalDraftUrl }}",
+              "type": "string"
+            },
+            {
+              "id": "timestamp",
+              "name": "completedAt",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9s0t1u2v-3w4x-5y6z-7a8b-9c0d1e2f3g4h",
+      "name": "Success Summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [3850, 100]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Video URLs from Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Video URLs from Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Process Video Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create CapCut Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Video Data": {
+      "main": [
+        [
+          {
+            "node": "Combine Draft with Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create CapCut Draft": {
+      "main": [
+        [
+          {
+            "node": "Extract Draft ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Draft ID": {
+      "main": [
+        [
+          {
+            "node": "Combine Draft with Videos",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Combine Draft with Videos": {
+      "main": [
+        [
+          {
+            "node": "Loop Through Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Through Videos": {
+      "main": [
+        [
+          {
+            "node": "Add Video to Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Video to Draft": {
+      "main": [
+        [
+          {
+            "node": "Wait Between Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Between Videos": {
+      "main": [
+        [
+          {
+            "node": "Check If All Videos Added",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If All Videos Added": {
+      "main": [
+        [
+          {
+            "node": "Save CapCut Draft",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Through Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save CapCut Draft": {
+      "main": [
+        [
+          {
+            "node": "Extract Task ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Task ID": {
+      "main": [
+        [
+          {
+            "node": "Wait Before First Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Before First Poll": {
+      "main": [
+        [
+          {
+            "node": "Poll Draft Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll Draft Status": {
+      "main": [
+        [
+          {
+            "node": "Check If Completed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Completed": {
+      "main": [
+        [
+          {
+            "node": "Extract Video URL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Before Next Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Before Next Poll": {
+      "main": [
+        [
+          {
+            "node": "Poll Draft Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Video URL": {
+      "main": [
+        [
+          {
+            "node": "Download Merged Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Merged Video": {
+      "main": [
+        [
+          {
+            "node": "Save Video to Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Video to Disk": {
+      "main": [
+        [
+          {
+            "node": "Success Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-11-15T00:00:00.000Z",
+  "versionId": "1"
+}
