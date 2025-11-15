@@ -3,14 +3,15 @@
   "nodes": [
     {
       "parameters": {},
-      "id": "c89e4b1b-8f2c-4a7a-9e3d-1a2b3c4d5e6f",
-      "name": "Manual Trigger",
+      "id": "start-node",
+      "name": "When clicking Test workflow",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [250, 300]
+      "position": [240, 300]
     },
     {
       "parameters": {
+        "authentication": "oAuth2",
         "operation": "read",
         "documentId": {
           "__rl": true,
@@ -22,75 +23,34 @@
           "value": "Sheet1",
           "mode": "name"
         },
-        "options": {
-          "range": "A:C"
-        }
+        "options": {}
       },
-      "id": "1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
-      "name": "Read Video URLs from Google Sheets",
+      "id": "google-sheets-node",
+      "name": "Google Sheets",
       "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4,
-      "position": [450, 300],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
-          "name": "Google Sheets account"
-        }
-      },
-      "notes": "Expected columns: video_url, start_time, end_time"
+      "typeVersion": 4.4,
+      "position": [440, 300],
+      "notes": "Reads video URLs from Google Sheets\n\nExpected columns:\n- video_url (required)\n- start_time (optional, default: 0)\n- end_time (optional, default: 10)"
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "video_urls_array",
-              "name": "videoUrls",
-              "value": "={{ $json.video_url }}",
-              "type": "string"
-            },
-            {
-              "id": "start_times",
-              "name": "startTime",
-              "value": "={{ $json.start_time || 0 }}",
-              "type": "number"
-            },
-            {
-              "id": "end_times",
-              "name": "endTime",
-              "value": "={{ $json.end_time || 10 }}",
-              "type": "number"
-            }
-          ]
-        },
-        "options": {}
+        "jsCode": "// Aggregate all video items and prepare for draft creation\nconst videos = [];\n\nfor (const item of $input.all()) {\n  videos.push({\n    video_url: item.json.video_url,\n    start_time: item.json.start_time || 0,\n    end_time: item.json.end_time || 10\n  });\n}\n\nreturn {\n  videos: videos,\n  videoCount: videos.length\n};"
       },
-      "id": "2b3c4d5e-6f7g-8h9i-0j1k-2l3m4n5o6p7q",
-      "name": "Process Video Data",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.2,
-      "position": [650, 300]
+      "id": "aggregate-videos-node",
+      "name": "Aggregate Videos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 300]
     },
     {
       "parameters": {
         "method": "POST",
         "url": "http://localhost:9001/create_draft",
-        "options": {
-          "timeout": 10000
-        },
+        "options": {},
         "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "width",
-              "value": "1920"
-            },
-            {
-              "name": "height",
-              "value": "1080"
-            }
-          ]
-        },
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"width\": 1920,\n  \"height\": 1080\n}",
+        "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
@@ -100,72 +60,42 @@
           ]
         }
       },
-      "id": "3c4d5e6f-7g8h-9i0j-1k2l-3m4n5o6p7q8r",
-      "name": "Create CapCut Draft",
+      "id": "create-draft-node",
+      "name": "Create Draft",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [850, 300],
-      "notes": "Creates a new CapCut draft project and returns draft_id"
+      "position": [840, 300],
+      "notes": "Creates a CapCut draft (1920x1080)"
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "draft_id_assignment",
-              "name": "draftId",
-              "value": "={{ $json.draft_id }}",
-              "type": "string"
-            },
-            {
-              "id": "draft_url_assignment",
-              "name": "initialDraftUrl",
-              "value": "={{ $json.draft_url }}",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
+        "jsCode": "// Combine draft_id with videos array\nconst draftId = $input.first().json.draft_id;\nconst videos = $('Aggregate Videos').first().json.videos;\n\nreturn {\n  draftId: draftId,\n  videos: videos\n};"
       },
-      "id": "4d5e6f7g-8h9i-0j1k-2l3m-4n5o6p7q8r9s",
-      "name": "Extract Draft ID",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.2,
-      "position": [1050, 300]
+      "id": "combine-data-node",
+      "name": "Combine Draft and Videos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1040, 300]
     },
     {
       "parameters": {
-        "mode": "combine",
-        "combineBy": "combineAll",
-        "options": {}
+        "jsCode": "// Split videos array into individual items\nconst draftId = $input.first().json.draftId;\nconst videos = $input.first().json.videos;\n\nreturn videos.map(video => ({\n  draftId: draftId,\n  ...video\n}));"
       },
-      "id": "5e6f7g8h-9i0j-1k2l-3m4n-5o6p7q8r9s0t",
-      "name": "Combine Draft with Videos",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 2.1,
-      "position": [1250, 300]
-    },
-    {
-      "parameters": {
-        "batchSize": 1,
-        "options": {}
-      },
-      "id": "6f7g8h9i-0j1k-2l3m-4n5o-6p7q8r9s0t1u",
-      "name": "Loop Through Videos",
-      "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 3,
-      "position": [1450, 300]
+      "id": "split-videos-node",
+      "name": "Split Into Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1240, 300]
     },
     {
       "parameters": {
         "method": "POST",
         "url": "http://localhost:9001/add_video",
-        "options": {
-          "timeout": 30000
-        },
+        "options": {},
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"draft_id\": \"{{ $node['Extract Draft ID'].json.draftId }}\",\n  \"video_url\": \"{{ $json.videoUrls }}\",\n  \"start\": {{ $json.startTime }},\n  \"end\": {{ $json.endTime }},\n  \"volume\": 1.0,\n  \"transition\": \"fade\"\n}",
+        "jsonBody": "={\n  \"draft_id\": \"{{ $json.draftId }}\",\n  \"video_url\": \"{{ $json.video_url }}\",\n  \"start\": {{ $json.start_time }},\n  \"end\": {{ $json.end_time }},\n  \"volume\": 1.0,\n  \"transition\": \"fade\"\n}",
+        "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
@@ -175,53 +105,32 @@
           ]
         }
       },
-      "id": "7g8h9i0j-1k2l-3m4n-5o6p-7q8r9s0t1u2v",
-      "name": "Add Video to Draft",
+      "id": "add-video-node",
+      "name": "Add Video",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1650, 300],
-      "notes": "Adds each video to the CapCut draft with specified timing and transitions"
+      "position": [1440, 300],
+      "notes": "Adds each video to the draft"
     },
     {
       "parameters": {
-        "amount": 1,
-        "unit": "seconds"
+        "jsCode": "// Aggregate results and extract draft_id for next step\nconst items = $input.all();\nconst draftId = items[0].json.draft_id || $('Combine Draft and Videos').first().json.draftId;\n\nreturn {\n  draftId: draftId,\n  videosAdded: items.length,\n  message: `Successfully added ${items.length} videos to draft ${draftId}`\n};"
       },
-      "id": "8h9i0j1k-2l3m-4n5o-6p7q-8r9s0t1u2v3w",
-      "name": "Wait Between Videos",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [1850, 300],
-      "webhookId": "wait-between-videos"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "string": [
-            {
-              "value1": "={{ $node['Loop Through Videos'].context.noItemsLeft }}",
-              "operation": "equals",
-              "value2": "true"
-            }
-          ]
-        }
-      },
-      "id": "9i0j1k2l-3m4n-5o6p-7q8r-9s0t1u2v3w4x",
-      "name": "Check If All Videos Added",
-      "type": "n8n-nodes-base.if",
+      "id": "aggregate-results-node",
+      "name": "Aggregate Results",
+      "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2050, 300]
+      "position": [1640, 300]
     },
     {
       "parameters": {
         "method": "POST",
         "url": "http://localhost:9001/save_draft",
-        "options": {
-          "timeout": 30000
-        },
+        "options": {},
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"draft_id\": \"{{ $node['Extract Draft ID'].json.draftId }}\",\n  \"draft_folder\": \"merged_videos_{{ $now.toFormat('yyyy-MM-dd_HH-mm-ss') }}\"\n}",
+        "jsonBody": "={\n  \"draft_id\": \"{{ $json.draftId }}\",\n  \"draft_folder\": \"merged_{{ $now.format('yyyy-MM-dd_HH-mm-ss') }}\"\n}",
+        "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
@@ -231,61 +140,48 @@
           ]
         }
       },
-      "id": "0j1k2l3m-4n5o-6p7q-8r9s-0t1u2v3w4x5y",
-      "name": "Save CapCut Draft",
+      "id": "save-draft-node",
+      "name": "Save Draft",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2250, 200],
-      "notes": "Saves the draft and initiates server-side processing. Returns task_id for status polling."
+      "position": [1840, 300],
+      "notes": "Saves draft and starts processing"
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
             {
-              "id": "task_id_assignment",
+              "id": "task_id",
               "name": "taskId",
               "value": "={{ $json.task_id }}",
               "type": "string"
             },
             {
-              "id": "draft_id_keep",
+              "id": "draft_id",
               "name": "draftId",
-              "value": "={{ $node['Extract Draft ID'].json.draftId }}",
+              "value": "={{ $('Aggregate Results').first().json.draftId }}",
               "type": "string"
             }
           ]
         },
         "options": {}
       },
-      "id": "1k2l3m4n-5o6p-7q8r-9s0t-1u2v3w4x5y6z",
-      "name": "Extract Task ID",
+      "id": "store-task-id-node",
+      "name": "Store Task ID",
       "type": "n8n-nodes-base.set",
-      "typeVersion": 3.2,
-      "position": [2450, 200]
-    },
-    {
-      "parameters": {
-        "amount": 5,
-        "unit": "seconds"
-      },
-      "id": "2l3m4n5o-6p7q-8r9s-0t1u-2v3w4x5y6z7a",
-      "name": "Wait Before First Poll",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [2650, 200],
-      "webhookId": "wait-before-poll"
+      "typeVersion": 3.3,
+      "position": [2040, 300]
     },
     {
       "parameters": {
         "method": "POST",
         "url": "http://localhost:9001/query_draft_status",
-        "options": {
-          "timeout": 10000
-        },
+        "options": {},
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"task_id\": \"{{ $json.taskId }}\"\n}",
+        "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
@@ -295,372 +191,337 @@
           ]
         }
       },
-      "id": "3m4n5o6p-7q8r-9s0t-1u2v-3w4x5y6z7a8b",
-      "name": "Poll Draft Status",
+      "id": "check-status-node",
+      "name": "Check Status",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2850, 200],
-      "notes": "Polls the CapCut API to check if draft processing is complete"
+      "position": [2240, 300],
+      "notes": "Check draft processing status\n\nNote: Manually re-run this node every 10-15 seconds until completed"
     },
     {
       "parameters": {
         "conditions": {
-          "string": [
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
             {
-              "value1": "={{ $json.status }}",
-              "operation": "equals",
-              "value2": "completed"
+              "id": "status-completed",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "singleValue": true
+              }
             }
-          ]
-        }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       },
-      "id": "4n5o6p7q-8r9s-0t1u-2v3w-4x5y6z7a8b9c",
-      "name": "Check If Completed",
+      "id": "if-completed-node",
+      "name": "If Completed",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [3050, 200]
-    },
-    {
-      "parameters": {
-        "amount": 10,
-        "unit": "seconds"
-      },
-      "id": "5o6p7q8r-9s0t-1u2v-3w4x-5y6z7a8b9c0d",
-      "name": "Wait Before Next Poll",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [3250, 300],
-      "webhookId": "wait-poll-loop"
+      "position": [2440, 300]
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
             {
-              "id": "final_draft_url",
-              "name": "finalDraftUrl",
-              "value": "={{ $json.draft_url }}",
+              "id": "download_url",
+              "name": "downloadUrl",
+              "value": "={{ $json.video_url || $json.draft_url }}",
               "type": "string"
             },
             {
-              "id": "video_url_extract",
-              "name": "videoDownloadUrl",
-              "value": "={{ $json.video_url || $json.draft_url }}",
+              "id": "draft_url",
+              "name": "draftUrl",
+              "value": "={{ $json.draft_url }}",
               "type": "string"
             }
           ]
         },
         "options": {}
       },
-      "id": "6p7q8r9s-0t1u-2v3w-4x5y-6z7a8b9c0d1e",
-      "name": "Extract Video URL",
+      "id": "extract-url-node",
+      "name": "Extract URL",
       "type": "n8n-nodes-base.set",
-      "typeVersion": 3.2,
-      "position": [3250, 100]
+      "typeVersion": 3.3,
+      "position": [2640, 200]
     },
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $json.videoDownloadUrl }}",
+        "url": "={{ $json.downloadUrl }}",
         "options": {
-          "timeout": 300000,
           "response": {
             "response": {
-              "responseFormat": "file"
+              "responseFormat": "file",
+              "outputPropertyName": "data"
             }
           }
         },
+        "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "User-Agent",
-              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+              "value": "Mozilla/5.0"
             }
           ]
         }
       },
-      "id": "7q8r9s0t-1u2v-3w4x-5y6z-7a8b9c0d1e2f",
-      "name": "Download Merged Video",
+      "id": "download-video-node",
+      "name": "Download Video",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [3450, 100],
-      "notes": "Downloads the final merged video file from CapCut"
-    },
-    {
-      "parameters": {
-        "operation": "write",
-        "fileName": "=merged_video_{{ $now.toFormat('yyyy-MM-dd_HH-mm-ss') }}.mp4",
-        "options": {}
-      },
-      "id": "8r9s0t1u-2v3w-4x5y-6z7a-8b9c0d1e2f3g",
-      "name": "Save Video to Disk",
-      "type": "n8n-nodes-base.writeFile",
-      "typeVersion": 1,
-      "position": [3650, 100],
-      "notes": "Saves the downloaded video to the local file system"
+      "position": [2840, 200],
+      "notes": "Downloads video as binary data"
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
             {
-              "id": "success_message",
+              "id": "success",
+              "name": "status",
+              "value": "success",
+              "type": "string"
+            },
+            {
+              "id": "message",
               "name": "message",
-              "value": "Video successfully merged and downloaded!",
+              "value": "Video merged and downloaded successfully!",
               "type": "string"
             },
             {
-              "id": "file_path",
-              "name": "filePath",
-              "value": "={{ $json.fileName }}",
-              "type": "string"
-            },
-            {
-              "id": "draft_url_final",
+              "id": "draft_url",
               "name": "draftUrl",
-              "value": "={{ $node['Extract Video URL'].json.finalDraftUrl }}",
+              "value": "={{ $('Extract URL').item.json.draftUrl }}",
               "type": "string"
             },
             {
-              "id": "timestamp",
-              "name": "completedAt",
-              "value": "={{ $now.toISO() }}",
+              "id": "info",
+              "name": "info",
+              "value": "Binary video data is in the 'data' field. To save to disk, add a 'Move Binary Data' node or download from workflow output.",
               "type": "string"
             }
           ]
         },
         "options": {}
       },
-      "id": "9s0t1u2v-3w4x-5y6z-7a8b-9c0d1e2f3g4h",
-      "name": "Success Summary",
+      "id": "success-node",
+      "name": "Success",
       "type": "n8n-nodes-base.set",
-      "typeVersion": 3.2,
-      "position": [3850, 100]
+      "typeVersion": 3.3,
+      "position": [3040, 200]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "status",
+              "name": "status",
+              "value": "processing",
+              "type": "string"
+            },
+            {
+              "id": "message",
+              "name": "message",
+              "value": "Video is still processing...",
+              "type": "string"
+            },
+            {
+              "id": "current_status",
+              "name": "currentStatus",
+              "value": "={{ $json.status }}",
+              "type": "string"
+            },
+            {
+              "id": "task_id",
+              "name": "taskId",
+              "value": "={{ $('Store Task ID').item.json.taskId }}",
+              "type": "string"
+            },
+            {
+              "id": "instruction",
+              "name": "instruction",
+              "value": "Wait 10-15 seconds and re-execute the 'Check Status' node",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "still-processing-node",
+      "name": "Still Processing",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [2640, 400]
     }
   ],
   "connections": {
-    "Manual Trigger": {
+    "When clicking Test workflow": {
       "main": [
         [
           {
-            "node": "Read Video URLs from Google Sheets",
+            "node": "Google Sheets",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Read Video URLs from Google Sheets": {
+    "Google Sheets": {
       "main": [
         [
           {
-            "node": "Process Video Data",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Create CapCut Draft",
+            "node": "Aggregate Videos",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Process Video Data": {
+    "Aggregate Videos": {
       "main": [
         [
           {
-            "node": "Combine Draft with Videos",
+            "node": "Create Draft",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Create CapCut Draft": {
+    "Create Draft": {
       "main": [
         [
           {
-            "node": "Extract Draft ID",
+            "node": "Combine Draft and Videos",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Extract Draft ID": {
+    "Combine Draft and Videos": {
       "main": [
         [
           {
-            "node": "Combine Draft with Videos",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Combine Draft with Videos": {
-      "main": [
-        [
-          {
-            "node": "Loop Through Videos",
+            "node": "Split Into Items",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Loop Through Videos": {
+    "Split Into Items": {
       "main": [
         [
           {
-            "node": "Add Video to Draft",
+            "node": "Add Video",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Add Video to Draft": {
+    "Add Video": {
       "main": [
         [
           {
-            "node": "Wait Between Videos",
+            "node": "Aggregate Results",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Wait Between Videos": {
+    "Aggregate Results": {
       "main": [
         [
           {
-            "node": "Check If All Videos Added",
+            "node": "Save Draft",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Check If All Videos Added": {
+    "Save Draft": {
       "main": [
         [
           {
-            "node": "Save CapCut Draft",
+            "node": "Store Task ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Task ID": {
+      "main": [
+        [
+          {
+            "node": "Check Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Status": {
+      "main": [
+        [
+          {
+            "node": "If Completed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Completed": {
+      "main": [
+        [
+          {
+            "node": "Extract URL",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Loop Through Videos",
+            "node": "Still Processing",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Save CapCut Draft": {
+    "Extract URL": {
       "main": [
         [
           {
-            "node": "Extract Task ID",
+            "node": "Download Video",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Extract Task ID": {
+    "Download Video": {
       "main": [
         [
           {
-            "node": "Wait Before First Poll",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Wait Before First Poll": {
-      "main": [
-        [
-          {
-            "node": "Poll Draft Status",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Poll Draft Status": {
-      "main": [
-        [
-          {
-            "node": "Check If Completed",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Check If Completed": {
-      "main": [
-        [
-          {
-            "node": "Extract Video URL",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Wait Before Next Poll",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Wait Before Next Poll": {
-      "main": [
-        [
-          {
-            "node": "Poll Draft Status",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Extract Video URL": {
-      "main": [
-        [
-          {
-            "node": "Download Merged Video",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Download Merged Video": {
-      "main": [
-        [
-          {
-            "node": "Save Video to Disk",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Save Video to Disk": {
-      "main": [
-        [
-          {
-            "node": "Success Summary",
+            "node": "Success",
             "type": "main",
             "index": 0
           }
@@ -674,7 +535,7 @@
   },
   "staticData": null,
   "tags": [],
-  "triggerCount": 1,
-  "updatedAt": "2025-11-15T00:00:00.000Z",
-  "versionId": "1"
+  "triggerCount": 0,
+  "updatedAt": "2025-11-15T12:00:00.000Z",
+  "versionId": "3"
 }
