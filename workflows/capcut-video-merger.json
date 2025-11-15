@@ -34,7 +34,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Aggregate all video items and calculate sequential timeline positions\nconst videos = [];\nlet currentPosition = 0;\n\nfor (const item of $input.all()) {\n  const duration = item.json.duration || item.json.end_time || 10;\n  \n  videos.push({\n    video_url: item.json.video_url,\n    start_time: currentPosition,\n    end_time: currentPosition + duration,\n    duration: duration\n  });\n  \n  currentPosition += duration;\n}\n\nreturn {\n  videos: videos,\n  videoCount: videos.length,\n  totalDuration: currentPosition\n};"
+        "jsCode": "// Aggregate all video items and calculate sequential timeline positions\n// CapCut API uses MICROSECONDS (1 second = 1,000,000 microseconds)\nconst videos = [];\nlet currentPosition = 0;\n\nfor (const item of $input.all()) {\n  const durationSeconds = item.json.duration || item.json.end_time || 10;\n  const durationMicroseconds = durationSeconds * 1000000;\n  \n  videos.push({\n    video_url: item.json.video_url,\n    start_time: currentPosition,\n    end_time: currentPosition + durationMicroseconds,\n    duration: durationMicroseconds\n  });\n  \n  currentPosition += durationMicroseconds;\n}\n\nreturn {\n  videos: videos,\n  videoCount: videos.length,\n  totalDuration: currentPosition,\n  totalDurationSeconds: currentPosition / 1000000\n};"
       },
       "id": "aggregate-videos-node",
       "name": "Aggregate Videos",
